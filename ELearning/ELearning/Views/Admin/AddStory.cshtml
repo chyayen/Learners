@@ -1,0 +1,289 @@
+﻿@model ELearning.Models.StoryModel
+@{
+    ViewBag.Title = "Add New Story";
+}
+
+@section Styles {
+    <link href="~/Content/summernote/summernote-bs5.min.css" rel="stylesheet" />
+}
+
+<div class="pagetitle">
+    <h1>@ViewBag.Title</h1>
+    <nav>
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="@Url.Action("Index")">Home</a></li>
+            <li class="breadcrumb-item">Stories</li>
+            <li class="breadcrumb-item active">@ViewBag.Title</li>
+        </ol>
+    </nav>
+</div><!-- End Page Title -->
+
+<section class="section">
+
+    <div class="card">
+        <div class="card-body pt-3">
+            @Html.Raw(ViewData["AlertMessage"])
+            <form id="formAddStory" class="g-3">
+                <div class="row mb-3">
+                    <label for="inputText" class="col-sm-2 col-form-label">Title</label>
+                    <div class="col-sm-10">
+                        @Html.TextBox("Title", "", new { @class = "form-control", required = "" })
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <label for="inputText" class="col-sm-2 col-form-label">Class</label>
+                    <div class="col-sm-10">
+                        @Html.DropDownList("ClassID", new SelectList(Model.ClassList, "Value", "Text"), "-- Select --", new { @class = "form-select", required = "" })
+                    </div>
+                </div>
+                @*<div class="row mb-3">
+                        <label for="inputText" class="col-sm-2 col-form-label">Content</label>
+                        <div class="col-sm-10">
+                            <div class="quill-editor-custom" id="StoryContent"></div>
+                        </div>
+                    </div>*@
+
+                <!-- Section Dropdown -->
+                <div class="row mb-3" id="sectionContainer" style="display:none;">
+                    <label class="col-sm-2 col-form-label">Sections</label>
+                    <div class="col-sm-10">
+                        <select class="form-select" id="SectionIDs" name="SectionIDs" multiple required>
+                            <!-- Options will be dynamically loaded here -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Student Multi-Select -->
+                <div class="row mb-3" id="studentContainer" style="display:none;">
+                    <label class="col-sm-2 col-form-label">Students</label>
+                    <div class="col-sm-10">
+                        <select class="form-select" id="StudentIDs" name="StudentIDs" multiple required>
+                            <!-- Students will be dynamically populated here -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <label for="inputText" class="col-sm-2 col-form-label">Content</label>
+                    <div class="col-sm-10">
+                        @Html.TextArea("Content", new { @class = "form-control", rows = "20" })
+                    </div>
+                </div>
+                <div class="row mt-5">
+                    <label for="inputText" class="col-sm-2 col-form-label">&nbsp;</label>
+                    <div class="col-sm-10">
+                        <button type="button" class="btn btn-sm btn-primary" id="btnAddStory">Add</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</section>
+
+@section Scripts {
+    <script src="~/Content/summernote/summernote-bs5.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('#Content').summernote({
+                height: 300,  // set the height of the editor
+                callbacks: {
+                    onImageUpload: function (files) {
+                        uploadImage(files[0]);
+                    },
+                    onChange: function (contents, $editable) {
+                        // Add the class 'fb-page-content' to all <p> tags inside Summernote
+                        $('#Content').next().find('p').each(function () {
+                            $(this).addClass('fb-page-content');
+                        })
+                    }
+                }
+            });
+
+            // Initialize Select2 for dynamic field
+            $('#SectionIDs').select2({
+                theme: "bootstrap-5",
+                width: $(this).data('width') ? $(this).data('width') : $(this).hasClass('w-100') ? '100%' : 'style',
+                placeholder: "-- All --"
+            });
+            $('#StudentIDs').select2({
+                theme: "bootstrap-5",
+                width: $(this).data('width') ? $(this).data('width') : $(this).hasClass('w-100') ? '100%' : 'style',
+                placeholder: "-- All --"
+            });
+
+
+            // Populate Sections based on selected Class
+            function fetchSectionsByClass(classId) {
+                $.ajax({
+                    url: `/Admin/GetClassSectionsByClassID?classId=${classId}`,
+                    type: 'GET',
+                    success: function (sections) {
+                        $('#SectionIDs').empty();
+                        sections.forEach(section => {
+                            $('#SectionIDs').append(new Option(section.Name, section.ID));
+                        });
+                        $('#SectionIDs').find('option').prop('selected', true); // Select all students by default
+                        $('#sectionContainer').show(); // Show the section container
+
+                        const selectedSections = $('#SectionIDs').val();
+                        fetchStudentsBySection(classId, selectedSections);
+                    },
+                    error: function () {
+                        alert('Error loading sections');
+                    }
+                });
+            }
+
+            // Populate Students based on selected Sections
+            function fetchStudentsBySection(classId, sectionIds) {
+                $.ajax({
+                    url: '/Admin/GetClassStudentsBySectionID',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ classid: classId, sectionIds: sectionIds }),
+                    success: function (students) {
+                        $('#StudentIDs').empty();
+                        students.forEach(student => {
+                            $('#StudentIDs').append(new Option(student.Name, student.ID));
+                        });
+                        $('#StudentIDs').find('option').prop('selected', true); // Select all students by default
+                        $('#studentContainer').show(); // Show the student container
+                    },
+                    error: function () {
+                        alert('Error loading students');
+                    }
+                });
+            }
+
+            // Trigger fetch on Class selection
+            $('#ClassID').change(function () {
+                const classId = $(this).val();
+                if (classId) {
+                    fetchSectionsByClass(classId);
+                }
+            });
+
+            // Trigger fetch on Section selection
+            $('#SectionIDs').change(function () {
+                const selectedSections = $(this).val();
+                const classId = $('#ClassID').val();
+                fetchStudentsBySection(classId, selectedSections);
+                $('#StudentIDs').empty(); // Clear students if no sections are selected
+            });
+
+
+
+            @*//function will be called on button click having id btnAddStory
+            $("#btnAddStory").click(function () {
+                var storyModel = { //Passing data
+                    Title: $("#Title").val(), //Reading text box values using Jquery
+                    Content: $("#Content").val(),
+                    //Content: $("#StoryContent > .ql-editor").html(),
+                    ClassID: $("#ClassID").val() != null ? parseInt($("#ClassID").val()) : 0
+                };
+
+                $.ajax({
+                    type: "POST", //HTTP POST Method
+                    url: "@Url.Action("SaveStory", "Admin")", // Controller/View
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify({
+                        model: storyModel,
+                        action: "add"
+                    }),
+                    dataType: 'json',
+                    beforeSend: function () {
+                        Swal.showLoading();
+                    },
+                    success: function (result) {
+                        if (result.success) {
+                            Swal.fire({
+                                icon: "success",
+                                title: result.message,
+                            }).then(function () {
+                                window.location.href = "@Url.Action("ManageStories", "Admin")";
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: "error",
+                                title: result.message,
+                            });
+                        }
+                    }
+                });
+            });*@
+
+            // Function will be called on button click with id btnAddStory
+            $("#btnAddStory").click(function () {
+                // Constructing the story model with additional fields for SectionID and Student IDs
+                var storyModel = {
+                    Title: $("#Title").val(), // Reading text box values using jQuery
+                    Content: $("#Content").val(),
+                    ClassID: $("#ClassID").val() != null ? parseInt($("#ClassID").val()) : 0,
+                    SelectedSectionIds: $("#SectionIDs").val() ? $("#SectionIDs").val().map(Number) : [], // Selected section
+                    SelectedStudentIds: $("#StudentIDs").val() ? $("#StudentIDs").val().map(Number) : [] // Selected students as an array of integers
+                };
+
+                $.ajax({
+                    type: "POST", // HTTP POST Method
+                    url: "@Url.Action("SaveStory", "Admin")", // Controller action for saving the story
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify({
+                        model: storyModel,
+                        action: "add"
+                    }),
+                    dataType: 'json',
+                    beforeSend: function () {
+                        Swal.showLoading();
+                    },
+                    success: function (result) {
+                        if (result.success) {
+                            Swal.fire({
+                                icon: "success",
+                                title: result.message,
+                            }).then(function () {
+                                window.location.href = "@Url.Action("ManageStories", "Admin")";
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: "error",
+                                title: result.message,
+                            });
+                        }
+                    },
+                    error: function () {
+                        Swal.fire({
+                            icon: "error",
+                            title: "An error occurred while saving the story.",
+                        });
+                    }
+                });
+            });
+
+
+
+        });
+
+        // Image upload function
+        function uploadImage(file) {
+            var data = new FormData();
+            data.append("file", file);
+
+            $.ajax({
+                url: '/Admin/UploadStoryImages',  // Your upload URL
+                type: 'POST',
+                data: data,
+                contentType: false,
+                processData: false,
+                success: function (url) {
+                    $('#Content').summernote('insertImage', url);
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    alert('Error uploading image: ' + textStatus);
+                }
+            });
+        }
+    </script>
+
+}
+

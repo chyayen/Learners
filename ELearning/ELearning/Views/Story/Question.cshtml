@@ -1,0 +1,127 @@
+﻿@model ELearning.Models.QuestionStudentViewModel
+@{
+    Layout = "~/Views/Shared/_LayoutMain.cshtml";
+    ViewBag.Title = Model.StoryTitle;
+}
+ 
+
+<!-- Page Title -->
+<div class="page-title" data-aos="fade">
+    <div class="heading">
+        <div class="container">
+            <div class="row d-flex justify-content-center text-center">
+                <div class="col-lg-8">
+                    <h1>@ViewBag.Title</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+</div><!-- End Page Title -->
+<!-- Stories Story Details Section -->
+<section id="stories-story-details" class="stories-story-details section">
+
+    <div class="container" data-aos="fade-up">
+        <div id="questionnaire">
+            @if (Model.Questions.Count > 0)
+            {
+                for (int i = 0; i < Model.Questions.Count; i++)
+                {
+                    <div class="mb-3">
+                        <p>@(i+1). @Model.Questions[i].Question</p>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-check"> 
+                                    @Html.TextArea($"Answer[{Model.Questions[i].ID}]", new { @class = "form-control", rows = "4" })
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <button type="button" class="btn btn-sm btn-primary" id="btnSubmitAnswers">Submit Answers</button> 
+            }
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        $(".progress-bar").animate({
+            width: "75%",
+        }, 2500);
+
+        function selectAnswer(idx) {
+            var answers = document.querySelectorAll(`input[name='question${idx}[]']`);
+
+            answers.forEach(checkbox => {
+                checkbox.addEventListener("change", function (e) {
+                    // When a checkbox is checked, uncheck all others in the same group
+                    if (e.target.checked) {
+                        answers.forEach(otherCheckbox => {
+                            if (otherCheckbox !== e.target) {
+                                otherCheckbox.checked = false;
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+        // Submit Answers
+        document.querySelector('#btnSubmitAnswers').addEventListener('click', function () { 
+            var questionResults = [];
+
+            // Populate questionResults with question IDs and their answers
+            $('#questionnaire textarea').each(function () {
+                var questionId = parseInt($(this).attr('id').split('_')[1], 10); // Get question ID from textarea ID
+                var answer = $(this).val();
+
+                questionResults.push({ QuestionID: questionId, Answer: answer });
+            });
+
+            var questionResultModel = {
+                QuestionResults: questionResults,
+                StoryID: @ViewContext.RouteData.Values["id"],
+                StudentID: @Session["UserID"],
+            };
+
+            $.ajax({
+                type: "POST", //HTTP POST Method
+                url: "@Url.Action("QuizSubmission", "Story")", // Controller/View
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify({
+                    model: questionResultModel
+                }),
+                dataType: 'json',
+                beforeSend: function () {
+                    Swal.showLoading();
+                },
+                success: function (result) {
+                    if (result.success) {
+                        Swal.fire({
+                            icon: "success",
+                            title: result.message,
+                        }).then(function () {
+                            location.href = "/Story/QuizHistory";
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: "error",
+                            title: result.message,
+                        });
+                    } 
+                },
+                error: function () {
+                    Swal.fire({
+                        icon: "error",
+                        title: "There was an error submitting your answers.",
+                    });
+                }
+            });
+        });
+
+
+    </script>
+
+
+}
